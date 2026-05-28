@@ -1,0 +1,22 @@
+Ryan Ficklin (individual)
+
+Running the program should be performed similar to the video provided in the lab
+specification. Multiple terminal windows or other multiplexing will be required.
+
+Then run:
+$go run server.go
+$go run client.go 1
+$go run client.go 2
+$go run client.go 3
+$go run client.go 4
+$go run client.go 5
+$go run client.go 6
+$go run client.go 7
+$go run client.go 8
+
+I had a bash script that opened up these terminal windows for me and ran the
+commands for testing. I have included this script, however, it is designed
+specifically for my shell (Konsole from KDE Plasma), so I do not expect it to
+be very portable and thus make no guarantees about its performance. However,
+I figured I should still include it because it is used during the video demo
+attached.
