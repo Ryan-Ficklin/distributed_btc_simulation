@@ -12,15 +12,16 @@ import (
 	//"strings"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/x509"
 	"sync"
 	"time"
 	//"encoding/hex"
 )
 
 const (
-	MAX_NODES    = 8
-	X_TIME       = 100
-	Y_TIME       = 200
+	MAX_NODES = 8
+	X_TIME    = 100
+	Y_TIME    = 200
 	//Z_TIME_MAX   = 100
 	//Z_TIME_MIN   = 10
 	ELECTION_MAX = 3000
@@ -57,12 +58,14 @@ func main() {
 	}
 
 	private_key, err := ecdsa.GenerateKey(elliptic.P256(), nil)
+	pk := private_key.Public()
+	pk_bytes, _ := x509.MarshalPKIXPublicKey(pk)
 	// proper error handling
 
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
-		ID: id, PubKey: private_key.Public(), Hbcounter: 0, Time: currTime, Alive: true,
+		ID: id, PubKey: pk_bytes, Hbcounter: 0, Time: currTime, Alive: true,
 	}
 	lastRecvHB = time.Now()
 
