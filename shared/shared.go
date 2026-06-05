@@ -20,6 +20,8 @@ type Node struct {
 	Hbcounter int
 	Time      time.Time
 	Alive     bool
+  Blockchain []Block
+  UTX       []Transaction
 }
 
 type Block struct {
@@ -42,7 +44,7 @@ type TX_Input struct {
 }
 
 type TX_Output struct {
-	Value  float32
+	Value  int
 	PubKey []byte
 }
 

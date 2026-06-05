@@ -96,6 +96,52 @@ func main() {
 
 // ~~~~~ BobbyCoin ~~~~~
 
+// given a recipient public key and value
+// find transactions on my block chain where my PK gets enough coins
+// create new TX struct giving value to recipient and sign it with my PK
+// add to my list of utx
+func create_TX(recipient PK, value int) {
+  
+
+}
+
+// given a value, find which blocks on my blockchain have that or more coins 
+// return block id and output index of block
+func collect_coins(value int) ([]byte, int) {
+  var block_id []byte = nil
+  var out_n int = -1
+
+  // loop through all blocks
+  for block, index := range self_node.Blockchain {
+    // find tx of mine with >= value
+    for out, out_index := range block.TX.Output {
+      // found one
+      if out.Value >= value && bytes.Equal(out.PubKey, self_node.PubKey) { 
+        // set the returns for now 
+        block_id = block.Block_ID
+        out_n = out_index
+
+        // check for double spend
+        for j := index+1; j < len(self_node.Blockchain); j++ {
+          // this out index of this blockchain is stale 
+          if self_node.Blockchain[j].TX.Input.N == out_n ||
+             bytes.Equal(block_id, self_node.Blockchain[j].Block_ID) {
+           // reset values -- not valid bc stale
+           block_id = nil
+           out_n = -1
+          }
+        }
+        // this transation was not double spent 
+        if block_id != nil {
+          return (block_id, out_n)
+        }
+      }
+    }
+  }
+  return (block_id, out_n)
+}
+
+
 // ~~~ RPCs for RAFT elections ~~~
 
 func printStatus(membership **shared.Membership) {
