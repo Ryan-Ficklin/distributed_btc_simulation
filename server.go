@@ -2,7 +2,7 @@ package main
 
 import (
 	"io"
-	"github.com/Ryan-Ficklin/CSC569_lab4/shared"
+	"github.com/Ryan-Ficklin/distributed_btc_simulation/shared"
 	"net/http"
 	"net/rpc"
 )

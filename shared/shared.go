@@ -5,6 +5,7 @@ import (
 	"time"
   "sync"
   "fmt"
+  "crypto/ecdsa"
 )
 
 const (
@@ -21,12 +22,13 @@ const (
 
 // Node struct represents a computing node.
 type Node struct {
-	ID        int
+  ID        int
+	PubKey    ecdsa.PublicKey
 	Hbcounter int
 	Time      time.Time
 	Alive     bool
   // parts of the node included for RAFT
-  ElectionState RAFT
+  //ElectionState RAFT
 }
 
 type RAFT struct {
@@ -282,3 +284,6 @@ func (bal *Ballots) Listen(ID int, reply *[]RaftMessage) error {
   delete(bal.BallotBox, ID) // clear inbox after reading 
   return nil
 }
+
+/* ~~~~~~~~~~~ */ 
+ 

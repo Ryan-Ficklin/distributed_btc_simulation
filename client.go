@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Ryan-Ficklin/CSC569_lab4/shared"
+	"github.com/Ryan-Ficklin/distributed_btc_simulation/shared"
 	"math/rand"
 	"net/rpc"
 	"os"
@@ -10,6 +10,9 @@ import (
 	//"strings"
 	"sync"
 	"time"
+  "crypto/ecdsa"
+  "crypto/elliptic"
+  //"encoding/hex"
 )
 
 const (
@@ -26,6 +29,7 @@ var (
   self_node shared.Node
   self_mutex sync.Mutex
   votesReceived int
+  private_key ecdsa.PrivateKey
   wg = &sync.WaitGroup{}
   lastRecvHB time.Time // last time a HB was recv from Leader
 )
@@ -49,17 +53,12 @@ func main() {
 		fmt.Println("Found Error", err)
 	}
 
-	fmt.Println("Node", id, "will fail after", Z_TIME, "seconds")
+  private_key = GenerateKey(elliptic.P256(), nil)
 
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
-    ID: id, Hbcounter: 0, Time: currTime, Alive: true, 
-    ElectionState: shared.RAFT {
-      Role: shared.Follower, 
-      CurrentTerm: 0, 
-      IDVotedFor: 0, // 0 means no one, >0 indicates the ID for which was voted
-    },
+    ID: id, Pubkey: private_key.Public(), Hbcounter: 0, Time: currTime, Alive: true, 
   }
   lastRecvHB = time.Now()
 
@@ -82,7 +81,7 @@ func main() {
 
   // RAFT election goroutines 
   // I want these seperate from the HB protocol
-  go processBallots(server, &membership)
+  //go processBallots(server, &membership)
   //go printStatus(&membership)
 
   // Gossip HB protocol
@@ -92,6 +91,10 @@ func main() {
 	wg.Add(1)
 	wg.Wait()
 }
+
+// ~~~~~ BobbyCoin ~~~~~
+
+
 
 // ~~~ RPCs for RAFT elections ~~~
 

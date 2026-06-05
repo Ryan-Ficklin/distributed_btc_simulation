@@ -1,3 +1,3 @@
-module github.com/Ryan-Ficklin/CSC569_lab4
+module github.com/Ryan-Ficklin/distributed_btc_simulation
 
 go 1.26.1
