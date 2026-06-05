@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"crypto"
+
 	//"crypto/sha256"
 	"fmt"
 	"math/rand"
@@ -16,7 +16,7 @@ const (
 // Node struct represents a computing node.
 type Node struct {
 	ID        int
-	PubKey    crypto.PublicKey
+	PubKey    []byte
 	Hbcounter int
 	Time      time.Time
 	Alive     bool
@@ -43,7 +43,7 @@ type TX_Input struct {
 
 type TX_Output struct {
 	Value  float32
-	PubKey crypto.PublicKey
+	PubKey []byte
 }
 
 // initialize 3 neighbors to reduce cases wherein nodes get stuck in a
