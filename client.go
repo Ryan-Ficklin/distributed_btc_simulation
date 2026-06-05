@@ -130,17 +130,22 @@ func create_TX(recipient PK, value int) {
     }
   }
 
+  input := shared.TX_Input{
+    Block_ID: block_id,
+    N: out_idx,
+  }
+
   // sign this input
   // TODO
-  encoding, _ := json.Marshal(
-  sig, _ := ecdsa.SignASN1(nil, 
+  in_encoding, _ := json.Marshal(input)
+  out_encoding, _ := json.Marshal(output)
+  encoding := append(in_encoding, out_encoding...)
+  hash := sha256.Sum256(encoding)
+  sig, _ := ecdsa.SignASN1(nil, private_key, hash)
 
   new_tx = shared.Transaction {
     Signature: sig, 
-    Input: shared.TX_Input{ 
-      Block_ID: block_id, 
-      N: out_idx,
-    },
+    Input: input,
     Output: output,
   }
 
