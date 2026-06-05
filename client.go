@@ -13,6 +13,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
+  "encoding/json"
 	"sync"
 	"time"
 	//"encoding/hex"
@@ -96,12 +97,57 @@ func main() {
 
 // ~~~~~ BobbyCoin ~~~~~
 
+// provide a user interface to give instructions for this computing node 
+func user(){
+
+}
+
 // given a recipient public key and value
 // find transactions on my block chain where my PK gets enough coins
 // create new TX struct giving value to recipient and sign it with my PK
 // add to my list of utx
 func create_TX(recipient PK, value int) {
+  // find coins from which to give 
+  block_id, out_idx := collect_coins(value)
+  block := find_block(block_id)
+
+  if block_id == nil {
+    return
+  }
   
+  // give our coins to our recipient
+  output := []shared.TX_Output{
+    shared.TX_Output{
+    Value: value,
+    PubKey: recipient,
+  }}
+
+  // give left over coins back to myself
+  if block.TX.Output[out_idx].Value > value {
+    append(output, shared.TX_Output{
+      Value: block.TX.Output[out_idx].Value - value,
+      PubKey: self_node.PubKey
+    }
+  }
+
+  // sign this input
+  // TODO
+  encoding, _ := json.Marshal(
+  sig, _ := ecdsa.SignASN1(nil, 
+
+  new_tx = shared.Transaction {
+    Signature: sig, 
+    Input: shared.TX_Input{ 
+      Block_ID: block_id, 
+      N: out_idx,
+    },
+    Output: output,
+  }
+
+  self_mutex.Lock()
+  // add my new transaction to my list of unverified transactions
+  append(self_node.UTX, new_tx)
+  self_mutex.Unlock()
 
 }
 
@@ -141,9 +187,37 @@ func collect_coins(value int) ([]byte, int) {
   return (block_id, out_n)
 }
 
+// given a block id, return the associated block from the block chain
+func find_block(id []byte) shared.Block {
+  for block, index := range.self_node.Blockchain {
+    if bytes.Equal(block.Block_ID, id) {
+      return block
+    }
+  }
+  return nil
+}
 
-// ~~~ RPCs for RAFT elections ~~~
+// TODO
+func validate_transaction(tx shared.Transaction) {
 
+}
+
+// TODO
+func validate_block(block shared.Block) {
+
+}
+
+// TODO
+func mine() {
+
+}
+
+// TODO 
+func compute_pow(tx shared.Transaction, prev_id []byte) {
+
+}
+
+// helper for continuously printing status
 func printStatus(membership **shared.Membership) {
 	for {
 		time.Sleep(1 * time.Second)
@@ -230,6 +304,9 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 	// received requests
 	(*membership) = shared.CombineTables(*membership, readMessages(server, id))
 	self_mutex.Unlock()
+
+  // TODO
+  // look for longest block chain of neighbors, add/subtract any new/spent transactions
 
 	// schedule the next gossip
 	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
