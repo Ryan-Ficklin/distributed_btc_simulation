@@ -11,12 +11,10 @@ func main() {
 	// create a Membership list
 	nodes := shared.NewMembership()
 	requests := shared.NewRequests()
-  ballots := shared.NewBallots()
 
 	// register nodes with `rpc.DefaultServer`
 	rpc.Register(nodes)
 	rpc.Register(requests)
-  rpc.Register(ballots)
 
 	// register an HTTP handler for RPC communication
 	rpc.HandleHTTP()

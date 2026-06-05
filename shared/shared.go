@@ -13,15 +13,6 @@ const (
 	MAX_NODES = 8
 )
 
-// raft role: leader, follower, candidate
-type RaftRole int
-
-const (
-	Follower  RaftRole = iota
-	Candidate RaftRole = iota
-	Leader    RaftRole = iota
-)
-
 // Node struct represents a computing node.
 type Node struct {
 	ID        int
@@ -29,14 +20,6 @@ type Node struct {
 	Hbcounter int
 	Time      time.Time
 	Alive     bool
-	// parts of the node included for RAFT
-	//ElectionState RAFT
-}
-
-type RAFT struct {
-	Role        RaftRole
-	CurrentTerm int
-	IDVotedFor  int
 }
 
 type Block struct {
@@ -267,47 +250,3 @@ func CombineTables(table1 *Membership, table2 *Membership) *Membership {
 
 	return combined
 }
-
-/* ~~~~~~~~~~~~~ */
-
-type RaftMessage struct {
-	From        int
-	To          int
-	Term        int
-	IsHeartbeat bool // True for HeartBeat
-	IsRequest   bool // True for Request Vote, False for reply (grant/deny)
-	VoteGranted bool // only matters when IsHeartbeat/IsRequest is False
-}
-
-type Ballots struct {
-	mutex     sync.RWMutex
-	BallotBox map[int][]RaftMessage
-}
-
-func NewBallots() *Ballots {
-	return &Ballots{
-		BallotBox: make(map[int][]RaftMessage),
-	}
-}
-
-// add a RaftMessage to our BallotBox
-func (bal *Ballots) Add(payload RaftMessage, reply *bool) error {
-	bal.mutex.Lock()
-	defer bal.mutex.Unlock()
-
-	bal.BallotBox[payload.To] = append(bal.BallotBox[payload.To], payload)
-	*reply = true
-	return nil
-}
-
-// return all the RaftMessages in the given node ID's ballotBox
-func (bal *Ballots) Listen(ID int, reply *[]RaftMessage) error {
-	bal.mutex.Lock()
-	defer bal.mutex.Unlock()
-
-	*reply = append([]RaftMessage(nil), bal.BallotBox[ID]...)
-	delete(bal.BallotBox, ID) // clear inbox after reading
-	return nil
-}
-
-/* ~~~~~~~~~~~ */
