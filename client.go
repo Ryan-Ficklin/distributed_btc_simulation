@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"slices"
 
 	"math/rand"
 	"net/rpc"
@@ -443,32 +442,31 @@ func check_difficulty(pow []byte, leading uint) bool {
 	}
 }
 
-
 func tx_contains(lst []shared.Transaction, item shared.Transaction) bool {
-  for _, tx := range lst {
-    // signature the same
-    sig_same := bytes.Equal(tx.Signature, item.Signature)
-    // input the same
-    input_same := bytes.Equal(tx.Input.Block_ID, item.Input.Block_ID) &&
-                  tx.Input.N == item.Input.N
+	for _, tx := range lst {
+		// signature the same
+		sig_same := bytes.Equal(tx.Signature, item.Signature)
+		// input the same
+		input_same := bytes.Equal(tx.Input.Block_ID, item.Input.Block_ID) &&
+			tx.Input.N == item.Input.N
 
-    // output the same 
-    output_same := true
-    if len(tx.Output) == len(item.Output) {
-      // check if each output is equal  
-      for i, o := range tx.Output {
-        output_same = output_same && o.Value == item.Output[i].Value 
-                                   && bytes.Equal(o.PubKey, item.Output[i].PubKey)
-      }
-    } else {
-      output_same = false
-    }
+		// output the same
+		output_same := true
+		if len(tx.Output) == len(item.Output) {
+			// check if each output is equal
+			for i, o := range tx.Output {
+				output_same = output_same && o.Value == item.Output[i].Value &&
+					bytes.Equal(o.PubKey, item.Output[i].PubKey)
+			}
+		} else {
+			output_same = false
+		}
 
-    if output_same && input_same && sig_same {
-      return true
-    }
-  }
-  return false
+		if output_same && input_same && sig_same {
+			return true
+		}
+	}
+	return false
 }
 
 // ~~~~~~~~ GOSSIP HB PROTOCOL ~~~~~~~~~~~~
@@ -564,7 +562,7 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 		// go through each member's list of UTX
 		//member_utx := set.From[*shared.Transaction](member.UTX)
 		for _, tx := range member.UTX {
-      if !tx_contains(self_node.UTX, tx) && !tx_contains(spent_tx, tx) {
+			if !tx_contains(self_node.UTX, tx) && !tx_contains(spent_tx, tx) {
 				self_mutex.Lock()
 				self_node.UTX = append(self_node.UTX, tx)
 				self_mutex.Unlock()
