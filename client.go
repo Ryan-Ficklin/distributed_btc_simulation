@@ -17,7 +17,6 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/binary"
 	"encoding/json"
 	"sync"
 	"time"
@@ -33,7 +32,7 @@ const (
 	ELECTION_MAX = 3000
 	ELECTION_MIN = 1500
 	LEADER_HB    = 500 // intervals for leader HB
-	DIFFICULTY   = 0x0000007FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+	DIFFICULTY   = 25
 )
 
 var (
@@ -273,67 +272,83 @@ func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 	return block_found
 }
 
-// given a candidate block and the previous block, validate that the 
-// candidate conforms to our protocol 
+// given a candidate block and the previous block, validate that the
+// candidate conforms to our protocol
 // assumes previous is well-formed but that is okay for honest nodes, as they
 // are assumed to be more powerful overall than anyone trying to manipulate this scheme
 func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool {
-  // does the block have all required fields?
-  if block.Block_ID == nil || block.Nonce == nil || block.POW == nil || block.Prev == nil {
-    fmt.Println("Missing required fields");
-    return false
-  }
+	// does the block have all required fields?
+	if block.Block_ID == nil || block.Nonce == nil || block.POW == nil || block.Prev == nil {
+		fmt.Println("Missing required fields")
+		return false
+	}
 
-  // compute pow 
-  encoding, _ := json.Marshal(tx)
-  encoding = append(encoding, prev_id...)
-  encoding = append(encoding, nonce...)
-  hash := sha256.Sum256(encoding)
-  //pow := binary.BigEndian.Uint64(hash[:])
+	// compute pow
+	encoding, _ := json.Marshal(block.TX)
+	encoding = append(encoding, block.Prev...)
+	encoding = append(encoding, block.Nonce...)
+	hash := sha256.Sum256(encoding)
+	//pow := binary.BigEndian.Uint64(hash[:])
 
-  // does the block have a sufficiently difficult POW?
-  /*if pow >= difficulty { 
-    return false
-  }*/
+	// does the block have a sufficiently difficult POW?
+	/*if pow >= difficulty {
+	  return false
+	}*/
 
-  // check that the pow passes the difficulty
-  if !check_difficulty(hash[:], difficulty) {
-    return false
-  }
-  
-  // does the pow actually produce the correct hash of the fields?
-  if !bytes.Equal(hash, block.POW) {
-    return false
-  }
+	// check that the pow passes the difficulty
+	if !check_difficulty(hash[:], difficulty) {
+		return false
+	}
 
-  // does previous point to the previous block's ID?
-  if !bytes.Equal(block.Prev, prev.Block_ID) {
-    return false
-  }
+	// does the pow actually produce the correct hash of the fields?
+	if !bytes.Equal(hash[:], block.POW) {
+		return false
+	}
 
-  // is block id computed correctly?
-  // the block_id should be the sha256 of the transaction
-  tx_encoding, _ := json.Marshal(tx)
-  tx_hash := sha256.Sum256(tx_encoding)
+	// does previous point to the previous block's ID?
+	if !bytes.Equal(block.Prev, prev.Block_ID) {
+		return false
+	}
 
-  if !bytes.Equal(block.Block_ID, tx_hash) {
-    return false
-  }
+	// is block id computed correctly?
+	// the block_id should be the sha256 of the transaction
+	tx_encoding, _ := json.Marshal(block.TX)
+	tx_hash := sha256.Sum256(tx_encoding)
 
-  // has the block been seen before?
-  for _, curr := range self_node.Blockchain {
-    if bytes.Equal(curr.Block_ID, block.Block_ID) {
-      return false
-    }
-  }
+	if !bytes.Equal(block.Block_ID, tx_hash[:]) {
+		return false
+	}
 
-  // is the transaction valid?
-  return validate_transaction(block.TX, true)
+	// has the block been seen before?
+	for _, curr := range self_node.Blockchain {
+		if bytes.Equal(curr.Block_ID, block.Block_ID) {
+			return false
+		}
+	}
+
+	// is the transaction valid?
+	return validate_transaction(block.TX, true)
 }
 
-// TODO
-func mine() {
-
+// mine valid block
+func mine() shared.Block {
+	// go through utx
+	utx_num := rand.Intn((len(self_node.UTX) - 1)) // from 0 to len-1
+	utx := self_node.UTX[utx_num]
+	// set prev to current last block in bc
+	prev := self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID
+	// compute
+	hash, nonce := compute_pow(utx, prev, DIFFICULTY)
+	// return
+	tx_encoding, _ := json.Marshal(utx)
+	tx_hash := sha256.Sum256(tx_encoding)
+	return shared.Block{
+		Block_ID: tx_hash[:],
+		Nonce:    nonce,
+		POW:      hash,
+		Prev:     prev,
+		TX:       utx,
+	}
 }
 
 // given a transaction and a previous block ID, compute the proof of work
@@ -358,15 +373,15 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 		// check that the integer representation of our hash has the proper amt
 		// of leading 0s
 		/*
-    attempt := binary.BigEndian.Uint64(hash[:])
-		if attempt < difficulty {
-			return hash[:], nonce
-		}*/
+			    attempt := binary.BigEndian.Uint64(hash[:])
+					if attempt < difficulty {
+						return hash[:], nonce
+					}*/
 
-    // check that the pow passes the difficulty
-    if check_difficulty(hash[:], difficulty) {
-      return hash[:], nonce
-    }
+		// check that the pow passes the difficulty
+		if check_difficulty(hash[:], difficulty) {
+			return hash[:], nonce
+		}
 
 	}
 }
@@ -382,33 +397,33 @@ func printStatus(membership **shared.Membership) {
 
 // given a byte array and a number of 0 bits, check if pow has that many leading 0s
 func check_difficulty(pow []byte, leading uint) bool {
-  // trivially true
-  if leading == 0 {
-    return true
-  }
-  
-  // pow could not possibly achieve this difficulty
-  if uint(len(pow))*8 < leading {
-    return false
-  }
-  
-  bytes := leading/8
-  remaining := leading%8
+	// trivially true
+	if leading == 0 {
+		return true
+	}
 
-  // bytes 
-  for i := 0; i < int(bytes); i++ {
-    if pow[i] != 0 {
-      return false
-    }
-  }
-  
-  // bits 
-  if remaining > 0 {
-    // shift to isolate leading bits 
-    return (pow[bytes] >> (8 - remaining)) == 0
-  } else {
-    return true
-  }
+	// pow could not possibly achieve this difficulty
+	if uint(len(pow))*8 < leading {
+		return false
+	}
+
+	bytes := leading / 8
+	remaining := leading % 8
+
+	// bytes
+	for i := 0; i < int(bytes); i++ {
+		if pow[i] != 0 {
+			return false
+		}
+	}
+
+	// bits
+	if remaining > 0 {
+		// shift to isolate leading bits
+		return (pow[bytes] >> (8 - remaining)) == 0
+	} else {
+		return true
+	}
 }
 
 // ~~~~~~~~ GOSSIP HB PROTOCOL ~~~~~~~~~~~~
