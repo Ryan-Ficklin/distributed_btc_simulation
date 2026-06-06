@@ -180,7 +180,7 @@ func collect_coins(value int) ([]byte, int) {
 				// check for double spend
 				for j := index + 1; j < len(self_node.Blockchain); j++ {
 					// this out index of this blockchain is stale
-					if self_node.Blockchain[j].TX.Input.N == out_n ||
+					if self_node.Blockchain[j].TX.Input.N == out_n &&
 						bytes.Equal(block_id, self_node.Blockchain[j].Block_ID) {
 						// reset values -- not valid bc stale
 						block_id = nil
@@ -207,9 +207,68 @@ func find_block(id []byte) shared.Block {
 	return shared.Block{} // not sure if this is what we want...? but couldn't just return nil
 }
 
-// TODO
-func validate_transaction(tx shared.Transaction) {
+func validate_transaction(tx shared.Transaction, coinbase bool) bool {
+	// check for required fields
+	var total int
+	if tx.Signature == nil || tx.Input.Block_ID == nil || tx.Input.N == -1 || len(tx.Output) == 0 {
+		fmt.Println("invalid transaction: missing required fields")
+		return false
+	}
+	// check total # of coins in tx
+	for _, out := range tx.Output {
+		if out.Value < 0 {
+			fmt.Println("Output value negative")
+			return false
+		}
+		total += out.Value
+	}
+	// coinbase special case
+	if coinbase {
+		if tx.Output[len(tx.Output)-1].Value != 50 {
+			fmt.Println("Invalid coinbase")
+			return false
+		}
+		total -= 50
+	}
+	// check double spend
+	block_found := false
+	for _, block := range self_node.Blockchain {
+		if block.TX.Input.N == tx.Input.N &&
+			bytes.Equal(tx.Input.Block_ID, block.Block_ID) {
+			fmt.Println("Double spend")
+			return false
+		}
+		// find block
+		// check id, then check input
+		if bytes.Equal(block.Block_ID, tx.Input.Block_ID) {
+			block_found = true
+			val := block.TX.Output[tx.Input.N].Value
+			if val != total {
+				fmt.Println("Block value does not match total")
+				return false
+			}
+			// verify sig (takes key, hash, sig)
+			var pk *ecdsa.PublicKey
+			key, _ := x509.ParsePKIXPublicKey(block.TX.Output[tx.Input.N].PubKey)
+			switch key := key.(type) {
+			case *ecdsa.PublicKey:
+				pk = key
+			default:
+				fmt.Println("Incorrect type of key")
+				return false
+			}
+			in_encoding, _ := json.Marshal(block.TX.Input)
+			out_encoding, _ := json.Marshal(block.TX.Output)
+			encoding := append(in_encoding, out_encoding...)
+			hash := sha256.Sum256(encoding)
+			if !ecdsa.VerifyASN1(pk, hash[:], tx.Signature) {
+				fmt.Println("Invalid signature")
+				return false
+			}
+		}
 
+	}
+	return block_found
 }
 
 // TODO
