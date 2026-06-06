@@ -564,7 +564,7 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 		// go through each member's list of UTX
 		//member_utx := set.From[*shared.Transaction](member.UTX)
 		for _, tx := range member.UTX {
-			if !slices.Contains(self_node.UTX, tx) && !slices.Contains(spent_tx, tx) {
+      if !tx_contains(self_node.UTX, tx) && !tx_contains(spent_tx, tx) {
 				self_mutex.Lock()
 				self_node.UTX = append(self_node.UTX, tx)
 				self_mutex.Unlock()
