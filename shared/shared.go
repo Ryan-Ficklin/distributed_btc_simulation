@@ -26,7 +26,7 @@ type Node struct {
 
 type Block struct {
 	Block_ID []byte
-	Nonce    int
+	Nonce    []byte
 	POW      []byte // [Size]byte
 	Prev     []byte
 	TX       Transaction

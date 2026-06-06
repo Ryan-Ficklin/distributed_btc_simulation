@@ -15,7 +15,9 @@ import (
 	"crypto/elliptic"
 	"crypto/sha256"
 	"crypto/x509"
+  "crypto/rand"
 	"encoding/json"
+  "encoding/binary"
 	"sync"
 	"time"
 	//"encoding/hex"
@@ -30,6 +32,7 @@ const (
 	ELECTION_MAX = 3000
 	ELECTION_MIN = 1500
 	LEADER_HB    = 500 // intervals for leader HB
+  DIFFICULTY = 0x0000007FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 )
 
 var (
@@ -138,7 +141,6 @@ func create_TX(recipient []byte, value int) {
 	}
 
 	// sign this input
-	// TODO
 	in_encoding, _ := json.Marshal(input)
 	out_encoding, _ := json.Marshal(output)
 	encoding := append(in_encoding, out_encoding...)
@@ -219,9 +221,32 @@ func mine() {
 
 }
 
-// TODO
-func compute_pow(tx shared.Transaction, prev_id []byte) {
+// given a transaction and a previous block ID, compute the proof of work
+// necessary to mint this block
+func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint64) ([]byte, [32]byte){
+  // make space for our nonce
+  nonce := make([]byte, 32)
 
+  for{
+    // stop if you are trying to mine on an old block
+    if !byte.Equal(self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID, prev_id) {
+      return nil, nil
+    }
+    // get a random 32 byte nonce value 
+    rand.Read(nonce)
+    // compute sha256 to check for leading 0s 
+    encoding, _ := json.Marshal(tx)
+    encoding = append(encoding, prev_id...)
+    encoding = append(encoding, nonce...)
+    hash := sha256.Sum256(encoding)
+    
+    // check that the integer representation of our hash has the proper amt 
+    // of leading 0s 
+    attempt := binary.BigEndian.Uint64(hash)
+    if attempt < difficulty {
+      return hash, nonce
+    }
+  }  
 }
 
 // helper for continuously printing status
