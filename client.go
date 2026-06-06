@@ -330,6 +330,16 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 	return validate_transaction(block.TX, true)
 }
 
+func validate_blockchain(blockchain []shared.Block) bool {
+	for i := 1; i < len(blockchain); i++ {
+		prev := blockchain[i-1]
+		if !validate_block(blockchain[i], prev, DIFFICULTY) {
+			return false
+		}
+	}
+	return true
+}
+
 // mine valid block
 func mine() shared.Block {
 	// go through utx
@@ -507,6 +517,9 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 
 	// TODO
 	// look for longest block chain of neighbors, add/subtract any new/spent transactions
+	// loop through membership table
+	// if length of member's bc > ours, validate blockchain
+	// transaction adding + removing
 
 	// schedule the next gossip
 	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
