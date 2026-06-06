@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"slices"
 
 	"math/rand"
 	"net/rpc"
@@ -10,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/Ryan-Ficklin/distributed_btc_simulation/shared"
-	"github.com/hashicorp/go-set"
 
 	//"strings"
 	"crypto/ecdsa"
@@ -43,7 +43,7 @@ var (
 	private_key   ecdsa.PrivateKey
 	wg            = &sync.WaitGroup{}
 	lastRecvHB    time.Time // last time a HB was recv from Leader
-	spent_tx      set.Set[*shared.Transaction]
+	spent_tx      []shared.Transaction
 )
 
 func main() {
@@ -333,13 +333,13 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 }
 
 func validate_blockchain(blockchain []shared.Block) bool {
-	var local_spent set.Set[*shared.Transaction]
+	var local_spent []shared.Transaction
 	for i := 1; i < len(blockchain); i++ {
 		prev := blockchain[i-1]
 		if !validate_block(blockchain[i], prev, DIFFICULTY) {
 			return false
 		}
-		local_spent.Insert(&blockchain[i].TX)
+		local_spent = append(local_spent, blockchain[i].TX)
 	}
 	self_mutex.Lock()
 	spent_tx = local_spent
@@ -532,6 +532,15 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 			self_mutex.Lock()
 			self_node.Blockchain = member.Blockchain
 			self_mutex.Unlock()
+		}
+		// go through each member's list of UTX
+		//member_utx := set.From[*shared.Transaction](member.UTX)
+		for _, tx := range member.UTX {
+			if !slices.Contains(self_node.UTX, tx) && !slices.Contains(spent_tx, tx) {
+				self_mutex.Lock()
+				self_node.UTX = append(self_node.UTX, tx)
+				self_mutex.Unlock()
+			}
 		}
 	}
 

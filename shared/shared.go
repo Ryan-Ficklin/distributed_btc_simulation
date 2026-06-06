@@ -15,13 +15,13 @@ const (
 
 // Node struct represents a computing node.
 type Node struct {
-	ID        int
-	PubKey    []byte
-	Hbcounter int
-	Time      time.Time
-	Alive     bool
-  Blockchain []Block
-  UTX       []Transaction
+	ID         int
+	PubKey     []byte
+	Hbcounter  int
+	Time       time.Time
+	Alive      bool
+	Blockchain []Block
+	UTX        []Transaction
 }
 
 type Block struct {
