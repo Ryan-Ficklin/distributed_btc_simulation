@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"net/rpc"
@@ -12,8 +13,9 @@ import (
 	//"strings"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/sha256"
 	"crypto/x509"
-  "encoding/json"
+	"encoding/json"
 	"sync"
 	"time"
 	//"encoding/hex"
@@ -97,8 +99,8 @@ func main() {
 
 // ~~~~~ BobbyCoin ~~~~~
 
-// provide a user interface to give instructions for this computing node 
-func user(){
+// provide a user interface to give instructions for this computing node
+func user() {
 
 }
 
@@ -106,100 +108,100 @@ func user(){
 // find transactions on my block chain where my PK gets enough coins
 // create new TX struct giving value to recipient and sign it with my PK
 // add to my list of utx
-func create_TX(recipient PK, value int) {
-  // find coins from which to give 
-  block_id, out_idx := collect_coins(value)
-  block := find_block(block_id)
+func create_TX(recipient []byte, value int) {
+	// find coins from which to give
+	block_id, out_idx := collect_coins(value)
+	block := find_block(block_id)
 
-  if block_id == nil {
-    return
-  }
-  
-  // give our coins to our recipient
-  output := []shared.TX_Output{
-    shared.TX_Output{
-    Value: value,
-    PubKey: recipient,
-  }}
+	if block_id == nil {
+		return
+	}
 
-  // give left over coins back to myself
-  if block.TX.Output[out_idx].Value > value {
-    append(output, shared.TX_Output{
-      Value: block.TX.Output[out_idx].Value - value,
-      PubKey: self_node.PubKey
-    }
-  }
+	// give our coins to our recipient
+	output := []shared.TX_Output{
+		shared.TX_Output{
+			Value:  value,
+			PubKey: recipient,
+		}}
 
-  input := shared.TX_Input{
-    Block_ID: block_id,
-    N: out_idx,
-  }
+	// give left over coins back to myself
+	if block.TX.Output[out_idx].Value > value {
+		output = append(output, shared.TX_Output{
+			Value:  block.TX.Output[out_idx].Value - value,
+			PubKey: self_node.PubKey,
+		})
+	}
 
-  // sign this input
-  // TODO
-  in_encoding, _ := json.Marshal(input)
-  out_encoding, _ := json.Marshal(output)
-  encoding := append(in_encoding, out_encoding...)
-  hash := sha256.Sum256(encoding)
-  sig, _ := ecdsa.SignASN1(nil, private_key, hash)
+	input := shared.TX_Input{
+		Block_ID: block_id,
+		N:        out_idx,
+	}
 
-  new_tx = shared.Transaction {
-    Signature: sig, 
-    Input: input,
-    Output: output,
-  }
+	// sign this input
+	// TODO
+	in_encoding, _ := json.Marshal(input)
+	out_encoding, _ := json.Marshal(output)
+	encoding := append(in_encoding, out_encoding...)
+	hash := sha256.Sum256(encoding)
+	sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
 
-  self_mutex.Lock()
-  // add my new transaction to my list of unverified transactions
-  append(self_node.UTX, new_tx)
-  self_mutex.Unlock()
+	new_tx := shared.Transaction{
+		Signature: sig,
+		Input:     input,
+		Output:    output,
+	}
+
+	self_mutex.Lock()
+	// add my new transaction to my list of unverified transactions
+	self_node.UTX = append(self_node.UTX, new_tx)
+	self_mutex.Unlock()
 
 }
 
-// given a value, find which blocks on my blockchain have that or more coins 
+// given a value, find which blocks on my blockchain have that or more coins
 // return block id and output index of block
 func collect_coins(value int) ([]byte, int) {
-  var block_id []byte = nil
-  var out_n int = -1
+	var block_id []byte = nil
+	var out_n int = -1
 
-  // loop through all blocks
-  for block, index := range self_node.Blockchain {
-    // find tx of mine with >= value
-    for out, out_index := range block.TX.Output {
-      // found one
-      if out.Value >= value && bytes.Equal(out.PubKey, self_node.PubKey) { 
-        // set the returns for now 
-        block_id = block.Block_ID
-        out_n = out_index
+	// loop through all blocks
+	for index, block := range self_node.Blockchain {
+		// find tx of mine with >= value
+		for out_index, out := range block.TX.Output {
+			// found one
+			if out.Value >= value && bytes.Equal(out.PubKey, self_node.PubKey) {
+				// set the returns for now
+				block_id = block.Block_ID
+				out_n = out_index
 
-        // check for double spend
-        for j := index+1; j < len(self_node.Blockchain); j++ {
-          // this out index of this blockchain is stale 
-          if self_node.Blockchain[j].TX.Input.N == out_n ||
-             bytes.Equal(block_id, self_node.Blockchain[j].Block_ID) {
-           // reset values -- not valid bc stale
-           block_id = nil
-           out_n = -1
-          }
-        }
-        // this transation was not double spent 
-        if block_id != nil {
-          return (block_id, out_n)
-        }
-      }
-    }
-  }
-  return (block_id, out_n)
+				// check for double spend
+				for j := index + 1; j < len(self_node.Blockchain); j++ {
+					// this out index of this blockchain is stale
+					if self_node.Blockchain[j].TX.Input.N == out_n ||
+						bytes.Equal(block_id, self_node.Blockchain[j].Block_ID) {
+						// reset values -- not valid bc stale
+						block_id = nil
+						out_n = -1
+					}
+				}
+				// this transation was not double spent
+				if block_id != nil {
+					return block_id, out_n
+				}
+			}
+		}
+	}
+	return block_id, out_n
 }
 
 // given a block id, return the associated block from the block chain
 func find_block(id []byte) shared.Block {
-  for block, index := range.self_node.Blockchain {
-    if bytes.Equal(block.Block_ID, id) {
-      return block
-    }
-  }
-  return nil
+	for _, block := range self_node.Blockchain { // maybe replace _ with index?
+		if bytes.Equal(block.Block_ID, id) {
+			return block
+		}
+	}
+	return shared.Block{} // not sure if this is what we want...? but couldn't just return nil
 }
 
 // TODO
@@ -217,7 +219,7 @@ func mine() {
 
 }
 
-// TODO 
+// TODO
 func compute_pow(tx shared.Transaction, prev_id []byte) {
 
 }
@@ -310,8 +312,8 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 	(*membership) = shared.CombineTables(*membership, readMessages(server, id))
 	self_mutex.Unlock()
 
-  // TODO
-  // look for longest block chain of neighbors, add/subtract any new/spent transactions
+	// TODO
+	// look for longest block chain of neighbors, add/subtract any new/spent transactions
 
 	// schedule the next gossip
 	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
