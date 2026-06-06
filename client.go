@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/rpc"
 	"os"
+  "io"
 	"strconv"
 
 	"github.com/Ryan-Ficklin/distributed_btc_simulation/shared"
@@ -63,12 +64,30 @@ func main() {
 	if err != nil {
 		fmt.Println("Found Error", err)
 	}
+  
+  // read key from keys.txt
+  fi, _ := os.Open("./keys.txt")
+  
+  // this is obviously super unsafe but makes the simulation easier 
+  scanner := bufio.NewScanner(fi)
+  i := 1
+  for scanner.Scan() {
+    // this line is my private key
+    if i == self_node.ID {
+      private_key_txt := scanner.Text()
+    }
+    i++
+  }
 
-	private_key, err := ecdsa.GenerateKey(elliptic.P256(), nil)
-	pk := private_key.Public()
-	pk_bytes, _ := x509.MarshalPKIXPublicKey(pk)
-	// proper error handling
-
+  private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), private_key_txt)
+	//private_key, err := ecdsa.GenerateKey(elliptic.P256(), nil)
+	pubkey := private_key.Public()
+	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
+  
+  // close keys.txt 
+  fi.Close()
+  
+  // proper error handling
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
