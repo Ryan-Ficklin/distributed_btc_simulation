@@ -207,6 +207,8 @@ func find_block(id []byte) shared.Block {
 	return shared.Block{} // not sure if this is what we want...? but couldn't just return nil
 }
 
+// given a transaction and an indicator of if the tx gives a reward to a miner
+// return if the tx conforms to out protocol
 func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 	// check for required fields
 	var total int
@@ -271,9 +273,57 @@ func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 	return block_found
 }
 
-// TODO
-func validate_block(block shared.Block) {
+// given a candidate block and the previous block, validate that the 
+// candidate conforms to our protocol 
+// assumes previous is well-formed but that is okay for honest nodes, as they
+// are assumed to be more powerful overall than anyone trying to manipulate this scheme
+func validate_block(block shared.Block, prev shared.Block, difficulty uint64) bool {
+  // does the block have all required fields?
+  if block.Block_ID == nil || block.Nonce == nil || block.POW == nil || block.Prev == nil {
+    fmt.Println("Missing required fields");
+    return false
+  }
 
+  // compute pow 
+  encoding, _ := json.Marshal(tx)
+  encoding = append(encoding, prev_id...)
+  encoding = append(encoding, nonce...)
+  hash := sha256.Sum256(encoding)
+  pow := binary.BigEndian.Uint64(hash[:])
+
+  // does the block have a sufficiently difficult POW?
+  if pow >= difficulty { 
+    return false
+  }
+  
+  // does the pow actually produce the correct hash of the fields?
+  if !bytes.Equal(hash, block.POW) {
+    return false
+  }
+
+  // does previous point to the previous block's ID?
+  if !bytes.Equal(block.Prev, prev.Block_ID) {
+    return false
+  }
+
+  // is block id computed correctly?
+  // the block_id should be the sha256 of the transaction
+  tx_encoding, _ := json.Marshal(tx)
+  tx_hash := sha256.Sum256(tx_encoding)
+
+  if !bytes.Equal(block.Block_ID, tx_hash) {
+    return false
+  }
+
+  // has the block been seen before?
+  for _, curr := range self_node.Blockchain {
+    if bytes.Equal(curr.Block_ID, block.Block_ID) {
+      return false
+    }
+  }
+
+  // is the transaction valid?
+  return validate_transaction(block.TX, true)
 }
 
 // TODO
