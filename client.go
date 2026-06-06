@@ -277,7 +277,7 @@ func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 // candidate conforms to our protocol 
 // assumes previous is well-formed but that is okay for honest nodes, as they
 // are assumed to be more powerful overall than anyone trying to manipulate this scheme
-func validate_block(block shared.Block, prev shared.Block, difficulty uint64) bool {
+func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool {
   // does the block have all required fields?
   if block.Block_ID == nil || block.Nonce == nil || block.POW == nil || block.Prev == nil {
     fmt.Println("Missing required fields");
@@ -289,10 +289,15 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint64) bo
   encoding = append(encoding, prev_id...)
   encoding = append(encoding, nonce...)
   hash := sha256.Sum256(encoding)
-  pow := binary.BigEndian.Uint64(hash[:])
+  //pow := binary.BigEndian.Uint64(hash[:])
 
   // does the block have a sufficiently difficult POW?
-  if pow >= difficulty { 
+  /*if pow >= difficulty { 
+    return false
+  }*/
+
+  // check that the pow passes the difficulty
+  if !check_difficulty(hash[:], difficulty) {
     return false
   }
   
@@ -333,7 +338,7 @@ func mine() {
 
 // given a transaction and a previous block ID, compute the proof of work
 // necessary to mint this block
-func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint64) ([]byte, []byte) {
+func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte, []byte) {
 	// make space for our nonce
 	nonce := make([]byte, 32)
 
@@ -352,10 +357,17 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint64) ([]by
 
 		// check that the integer representation of our hash has the proper amt
 		// of leading 0s
-		attempt := binary.BigEndian.Uint64(hash[:])
+		/*
+    attempt := binary.BigEndian.Uint64(hash[:])
 		if attempt < difficulty {
 			return hash[:], nonce
-		}
+		}*/
+
+    // check that the pow passes the difficulty
+    if check_difficulty(hash[:], difficulty) {
+      return hash[:], nonce
+    }
+
 	}
 }
 
@@ -366,6 +378,37 @@ func printStatus(membership **shared.Membership) {
 		printMembership(**membership)
 		//print("Hello!\n")
 	}
+}
+
+// given a byte array and a number of 0 bits, check if pow has that many leading 0s
+func check_difficulty(pow []byte, leading uint) bool {
+  // trivially true
+  if leading == 0 {
+    return true
+  }
+  
+  // pow could not possibly achieve this difficulty
+  if uint(len(pow))*8 < leading {
+    return false
+  }
+  
+  bytes := leading/8
+  remaining := leading%8
+
+  // bytes 
+  for i := 0; i < int(bytes); i++ {
+    if pow[i] != 0 {
+      return false
+    }
+  }
+  
+  // bits 
+  if remaining > 0 {
+    // shift to isolate leading bits 
+    return (pow[bytes] >> (8 - remaining)) == 0
+  } else {
+    return true
+  }
 }
 
 // ~~~~~~~~ GOSSIP HB PROTOCOL ~~~~~~~~~~~~
