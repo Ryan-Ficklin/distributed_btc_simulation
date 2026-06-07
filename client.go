@@ -46,7 +46,7 @@ var (
 	wg            = &sync.WaitGroup{}
 	lastRecvHB    time.Time // last time a HB was recv from Leader
 	spent_tx      []shared.Transaction
-	genesis_block = make_genesis()
+	genesis_block shared.Block
 )
 
 func main() {
@@ -95,6 +95,8 @@ func main() {
 	pubkey := making_private_key.Public()
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
 
+	genesis_block = make_genesis()
+
 	// proper error handling
 	currTime := calcTime()
 	// Construct self
@@ -135,8 +137,17 @@ func main() {
 
 // provide a user interface to give instructions for this computing node
 func user() {
-	genesis := make_genesis()
-	fmt.Printf("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
+	// genesis := make_genesis()
+	// fmt.Printf("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("\t0: Print keys\n",
+		"\t1: Print blockchain\n",
+		"\t2: Print UTX pool\n",
+		"\t3: Create UTX\n",
+		"\t4: Mine a block\n\n",
+		"Enter your choice -> ")
+	text, _ := reader.ReadString('\n')
+	fmt.Print(text)
 }
 
 // given a recipient public key and value
