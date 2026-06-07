@@ -96,6 +96,7 @@ func main() {
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
 
 	genesis_block = make_genesis()
+	self_node.Blockchain = append(self_node.Blockchain, genesis_block) // idek
 
 	// proper error handling
 	currTime := calcTime()
@@ -123,7 +124,7 @@ func main() {
 	sendMessage(server, neighbors[0], *membership)
 
 	// start bobbycoin user loop
-	go user()
+	go user(*membership)
 
 	// Gossip HB protocol
 	time.AfterFunc(time.Millisecond*X_TIME, func() { updateHeartbeat(server, &membership, id) })
@@ -136,18 +137,39 @@ func main() {
 // ~~~~~ BobbyCoin ~~~~~
 
 // provide a user interface to give instructions for this computing node
-func user() {
+func user(membership shared.Membership) {
 	// genesis := make_genesis()
 	// fmt.Printf("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 	fmt.Print("\t0: Print keys\n",
 		"\t1: Print blockchain\n",
 		"\t2: Print UTX pool\n",
 		"\t3: Create UTX\n",
 		"\t4: Mine a block\n\n",
 		"Enter your choice -> ")
-	text, _ := reader.ReadString('\n')
-	fmt.Print(text)
+	var choice int
+	fmt.Scanln(&choice)
+	switch choice {
+	case 0:
+		fmt.Print(choice)
+	case 1:
+		fmt.Print(self_node.Blockchain)
+	case 2:
+		fmt.Print(choice)
+	case 3:
+		//reader2 := bufio.NewReader(os.Stdin)
+		var id int
+		var amt int
+		fmt.Print("Who do you want to send money to?: ")
+		fmt.Scanln(&id)
+		fmt.Print("How much money?: ")
+		fmt.Scanln(&amt)
+		use_pk := lookup(id, membership)
+		create_TX(use_pk, amt)
+	case 4:
+		fmt.Print("blah")
+	}
+	go user(membership)
 }
 
 // given a recipient public key and value
@@ -156,20 +178,19 @@ func user() {
 // add to my list of utx
 func create_TX(recipient []byte, value int) {
 	// find coins from which to give
+	println("creating transaction...")
 	block_id, out_idx := collect_coins(value)
 	block := find_block(block_id)
-
 	if block_id == nil {
+		fmt.Println("Invalid block ID. No transaction created.")
 		return
 	}
-
 	// give our coins to our recipient
 	output := []shared.TX_Output{
 		shared.TX_Output{
 			Value:  value,
 			PubKey: recipient,
 		}}
-
 	// give left over coins back to myself
 	if block.TX.Output[out_idx].Value > value {
 		output = append(output, shared.TX_Output{
@@ -200,7 +221,6 @@ func create_TX(recipient []byte, value int) {
 	// add my new transaction to my list of unverified transactions
 	self_node.UTX = append(self_node.UTX, new_tx)
 	self_mutex.Unlock()
-
 }
 
 // given a value, find which blocks on my blockchain have that or more coins
@@ -208,7 +228,6 @@ func create_TX(recipient []byte, value int) {
 func collect_coins(value int) ([]byte, int) {
 	var block_id []byte = nil
 	var out_n int = -1
-
 	// loop through all blocks
 	for index, block := range self_node.Blockchain {
 		// find tx of mine with >= value
@@ -669,6 +688,10 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 
 	// schedule the next gossip
 	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
+}
+
+func lookup(key int, membership shared.Membership) []byte {
+	return membership.Members[key].PubKey
 }
 
 // only for killing nodes at random
