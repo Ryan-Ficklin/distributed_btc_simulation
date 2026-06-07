@@ -35,7 +35,7 @@ const (
 	ELECTION_MAX = 3000
 	ELECTION_MIN = 1500
 	LEADER_HB    = 500 // intervals for leader HB
-	DIFFICULTY   = 5
+	DIFFICULTY   = 25
 )
 
 var (
@@ -135,7 +135,7 @@ func main() {
 // provide a user interface to give instructions for this computing node
 func user() {
 	genesis := make_genesis()
-	fmt.Println("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
+	fmt.Printf("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
 }
 
 // given a recipient public key and value
