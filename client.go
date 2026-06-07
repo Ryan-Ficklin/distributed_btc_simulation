@@ -35,7 +35,7 @@ const (
 	ELECTION_MAX = 3000
 	ELECTION_MIN = 1500
 	LEADER_HB    = 500 // intervals for leader HB
-	DIFFICULTY   = 25
+	DIFFICULTY   = 5
 )
 
 var (
@@ -118,6 +118,9 @@ func main() {
 
 	sendMessage(server, neighbors[0], *membership)
 
+  // start bobbycoin user loop
+  go user()
+
 	// Gossip HB protocol
 	time.AfterFunc(time.Millisecond*X_TIME, func() { updateHeartbeat(server, &membership, id) })
 	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, &membership, id) })
@@ -130,7 +133,8 @@ func main() {
 
 // provide a user interface to give instructions for this computing node
 func user() {
-
+  genesis := make_genesis()
+  fmt.Println("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
 }
 
 // given a recipient public key and value
@@ -425,6 +429,37 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 		}
 
 	}
+}
+
+func make_genesis() shared.Block {
+  input := shared.TX_Input{ Block_ID: []byte("0000000000000000000000000000000000000000000000000000000000000000"), N: 0}
+  output := []shared.TX_Output{
+    shared.TX_Output{
+      Value:  50,
+      PubKey: self_node.PubKey,
+  }}
+
+  // sign this input
+  in_encoding, _ := json.Marshal(input)
+  out_encoding, _ := json.Marshal(output)
+  encoding := append(in_encoding, out_encoding...)
+  hash := sha256.Sum256(encoding)
+  sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
+
+  tx := shared.Transaction{ Signature: sig, Input: input, Output: output}
+
+  tx_encoding, _ := json.Marshal(tx)
+  tx_hash := sha256.Sum256(tx_encoding)
+
+  pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
+
+  return shared.Block{
+    Block_ID: tx_hash[:],
+    Nonce:    nonce,
+    POW:      pow0000000000000000000000000000000000000000000000000000000000000000,
+    Prev:     tx_hash[:],
+    TX:       tx,
+  }
 }
 
 // helper for continuously printing status
