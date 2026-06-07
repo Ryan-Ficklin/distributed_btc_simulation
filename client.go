@@ -69,9 +69,9 @@ func main() {
 
 	// read key from keys.txt
 	fi, err := os.Open("./keys.txt")
-  if err != nil {
-    panic("could not open file")
-  }
+	if err != nil {
+		panic("could not open file")
+	}
 
 	// this is obviously super unsafe but makes the simulation easier
 	scanner := bufio.NewScanner(fi)
@@ -84,13 +84,14 @@ func main() {
 		}
 		i++
 	}
-	
-  // close keys.txt
+
+	// close keys.txt
 	fi.Close()
-	
-  decoded_pk, _ := hex.DecodeString(private_key_txt[:len(private_key_txt)])
-	private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), decoded_pk)
-	pubkey := private_key.Public()
+
+	decoded_pk, _ := hex.DecodeString(private_key_txt[:len(private_key_txt)])
+	making_private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), decoded_pk)
+	private_key = *making_private_key
+	pubkey := making_private_key.Public()
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
 
 	// proper error handling
@@ -118,8 +119,8 @@ func main() {
 
 	sendMessage(server, neighbors[0], *membership)
 
-  // start bobbycoin user loop
-  go user()
+	// start bobbycoin user loop
+	go user()
 
 	// Gossip HB protocol
 	time.AfterFunc(time.Millisecond*X_TIME, func() { updateHeartbeat(server, &membership, id) })
@@ -133,8 +134,8 @@ func main() {
 
 // provide a user interface to give instructions for this computing node
 func user() {
-  genesis := make_genesis()
-  fmt.Println("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
+	genesis := make_genesis()
+	fmt.Println("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
 }
 
 // given a recipient public key and value
@@ -404,9 +405,9 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 
 	for {
 		// stop if you are trying to mine on an old block
-		if !bytes.Equal(self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID, prev_id) {
-			return nil, nil
-		}
+		// if !bytes.Equal(self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID, prev_id) {
+		// 	return nil, nil
+		// }
 		// get a random 32 byte nonce value
 		crand.Read(nonce)
 		// compute sha256 to check for leading 0s
@@ -432,34 +433,34 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 }
 
 func make_genesis() shared.Block {
-  input := shared.TX_Input{ Block_ID: []byte("0000000000000000000000000000000000000000000000000000000000000000"), N: 0}
-  output := []shared.TX_Output{
-    shared.TX_Output{
-      Value:  50,
-      PubKey: self_node.PubKey,
-  }}
+	input := shared.TX_Input{Block_ID: []byte("0000000000000000000000000000000000000000000000000000000000000000"), N: 0}
+	output := []shared.TX_Output{
+		shared.TX_Output{
+			Value:  50,
+			PubKey: self_node.PubKey,
+		}}
 
-  // sign this input
-  in_encoding, _ := json.Marshal(input)
-  out_encoding, _ := json.Marshal(output)
-  encoding := append(in_encoding, out_encoding...)
-  hash := sha256.Sum256(encoding)
-  sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
+	// sign this input
+	in_encoding, _ := json.Marshal(input)
+	out_encoding, _ := json.Marshal(output)
+	encoding := append(in_encoding, out_encoding...)
+	hash := sha256.Sum256(encoding)
+	sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
 
-  tx := shared.Transaction{ Signature: sig, Input: input, Output: output}
+	tx := shared.Transaction{Signature: sig, Input: input, Output: output}
 
-  tx_encoding, _ := json.Marshal(tx)
-  tx_hash := sha256.Sum256(tx_encoding)
+	tx_encoding, _ := json.Marshal(tx)
+	tx_hash := sha256.Sum256(tx_encoding)
 
-  pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
+	pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
 
-  return shared.Block{
-    Block_ID: tx_hash[:],
-    Nonce:    nonce,
-    POW:      pow0000000000000000000000000000000000000000000000000000000000000000,
-    Prev:     tx_hash[:],
-    TX:       tx,
-  }
+	return shared.Block{
+		Block_ID: tx_hash[:],
+		Nonce:    nonce,
+		POW:      pow,
+		Prev:     tx_hash[:],
+		TX:       tx,
+	}
 }
 
 // helper for continuously printing status
