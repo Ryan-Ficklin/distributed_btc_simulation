@@ -1,6 +1,8 @@
-Ryan Ficklin (individual)
+Ryan Ficklin, Madeline Park
 
-Running the program should be performed similar to the video provided in the lab
+See report pdf for information on contribution, system design, etc. 
+
+Running the program should be performed similar to the video provided
 specification. Multiple terminal windows or other multiplexing will be required.
 
 Then run:
@@ -13,6 +15,11 @@ $go run client.go 5
 $go run client.go 6
 $go run client.go 7
 $go run client.go 8
+
+Once these are open, all nodes have a small CLI that can be used to send 
+transactions to one another, mine transactions, and view the block chain as 
+blocks are minted and communicated. The demo video provided demonstrates 
+this functionality. 
 
 I had a bash script that opened up these terminal windows for me and ran the
 commands for testing. I have included this script, however, it is designed
