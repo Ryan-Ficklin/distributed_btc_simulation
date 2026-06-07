@@ -95,18 +95,25 @@ func main() {
 	pubkey := making_private_key.Public()
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
 
-	genesis_block = make_genesis()
-	self_node.Blockchain = append(self_node.Blockchain, genesis_block) // idek
-
 	// proper error handling
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
-		ID: id, PubKey: pubkey_bytes, Hbcounter: 0, Time: currTime, Alive: true,
+		ID: id, 
+    PubKey: pubkey_bytes, 
+    Hbcounter: 0, 
+    Time: currTime, 
+    Alive: true, 
+    Blockchain: []shared.Block{}, 
+    UTX: []shared.Transaction{},
 	}
 	lastRecvHB = time.Now()
-
-	var self_node_response shared.Node // Allocate space for a response to overwrite this
+  
+  // get our hard coded genesis block and add it to the start of our blockchain
+	genesis_block = make_genesis()
+	self_node.Blockchain = append(self_node.Blockchain, genesis_block)
+	
+  var self_node_response shared.Node // Allocate space for a response to overwrite this
 
 	// Add node with input ID
 	if err := server.Call("Membership.Add", self_node, &self_node_response); err != nil {
@@ -350,12 +357,6 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 	encoding = append(encoding, block.Prev...)
 	encoding = append(encoding, block.Nonce...)
 	hash := sha256.Sum256(encoding)
-	//pow := binary.BigEndian.Uint64(hash[:])
-
-	// does the block have a sufficiently difficult POW?
-	/*if pow >= difficulty {
-	  return false
-	}*/
 
 	// check that the pow passes the difficulty
 	if !check_difficulty(hash[:], difficulty) {
@@ -452,14 +453,6 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 		encoding = append(encoding, nonce...)
 		hash := sha256.Sum256(encoding)
 
-		// check that the integer representation of our hash has the proper amt
-		// of leading 0s
-		/*
-			    attempt := binary.BigEndian.Uint64(hash[:])
-					if attempt < difficulty {
-						return hash[:], nonce
-					}*/
-
 		// check that the pow passes the difficulty
 		if check_difficulty(hash[:], difficulty) {
 			return hash[:], nonce
@@ -478,13 +471,18 @@ func make_genesis() shared.Block {
 		}}
 
 	// sign this input
-	in_encoding, _ := json.Marshal(input)
+	/*
+  in_encoding, _ := json.Marshal(input)
 	out_encoding, _ := json.Marshal(output)
 	encoding := append(in_encoding, out_encoding...)
 	hash := sha256.Sum256(encoding)
 	sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
+  */
 
-	tx := shared.Transaction{Signature: sig, Input: input, Output: output}
+  // hardcode signature from client1's private key 
+  sig, _ := hex.DecodeString("30450220661a6b739f063f76b61860757ec03f37901576c367b53d6c07e9dfaede71f812022100e37c59a65c016259664f148095a55762aadbf31042cff8f0f9ea14ffe111779f") 
+	
+  tx := shared.Transaction{Signature: sig, Input: input, Output: output}
 
 	tx_encoding, _ := json.Marshal(tx)
 	tx_hash := sha256.Sum256(tx_encoding)
