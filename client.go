@@ -160,7 +160,7 @@ func user(membership shared.Membership) {
 	case 0:
 		fmt.Print(choice)
 	case 1:
-		fmt.Print(self_node.Blockchain)
+    printBlockchain(self_node.Blockchain)
 	case 2:
 		fmt.Print(choice)
 	case 3:
@@ -713,4 +713,26 @@ func printMembership(m shared.Membership) {
 			status)
 	}
 	fmt.Println("")
+}
+
+func printBlockchain(bc []shared.Block) {
+  for id, b := range bc {
+    fmt.Println(id)
+    printBlock(b)
+  }
+}
+
+func printBlock(b shared.Block) {
+  fmt.Printf("id: %x\nnonce: %x\npow: %x\nprev_id: %x\n",
+    b.Block_ID, b.Nonce, b.POW, b.Prev)
+  printTx(b.TX)
+}
+
+func printTx(tx shared.Transaction) {
+  fmt.Printf("signature: %x\ninput:\n{\n\tblock_id: %x\n\tout_id: %x\n}\noutput(s):\n{", 
+    tx.Signature, tx.Input.Block_ID, tx.Input.N)
+  for i, o := range tx.Output {
+    fmt.Printf("\n\t%d: {\n\tvalue: %d\n\tpub_key: %x\n\t}", i, o.Value, o.PubKey)
+  }
+  fmt.Printf("\n}\n")
 }
