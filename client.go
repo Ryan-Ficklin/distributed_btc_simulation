@@ -46,6 +46,7 @@ var (
 	wg            = &sync.WaitGroup{}
 	lastRecvHB    time.Time // last time a HB was recv from Leader
 	spent_tx      []shared.Transaction
+	genesis_block = make_genesis()
 )
 
 func main() {
@@ -363,6 +364,8 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 
 func validate_blockchain(blockchain []shared.Block) bool {
 	var local_spent []shared.Transaction
+	// check if blockchain[0] is our genesis
+
 	for i := 1; i < len(blockchain); i++ {
 		prev := blockchain[i-1]
 		if !validate_block(blockchain[i], prev, DIFFICULTY) {
@@ -405,9 +408,9 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 
 	for {
 		// stop if you are trying to mine on an old block
-		// if !bytes.Equal(self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID, prev_id) {
-		// 	return nil, nil
-		// }
+		if !bytes.Equal(self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID, prev_id) {
+			return nil, nil
+		}
 		// get a random 32 byte nonce value
 		crand.Read(nonce)
 		// compute sha256 to check for leading 0s
@@ -432,6 +435,7 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 	}
 }
 
+// this derives the hard-coded genesis block and was previously used to compute the POW
 func make_genesis() shared.Block {
 	input := shared.TX_Input{Block_ID: []byte("0000000000000000000000000000000000000000000000000000000000000000"), N: 0}
 	output := []shared.TX_Output{
@@ -452,7 +456,9 @@ func make_genesis() shared.Block {
 	tx_encoding, _ := json.Marshal(tx)
 	tx_hash := sha256.Sum256(tx_encoding)
 
-	pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
+	//pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
+	nonce, _ := hex.DecodeString("b4802fced14c868ab529e9f8c2a5c254785479394194a7d4e906af8b871235df")
+	pow, _ := hex.DecodeString("0000001527b4c459dac22efb8eeb229bdd9694563ca55dcbb7a92331e3bcc905")
 
 	return shared.Block{
 		Block_ID: tx_hash[:],
@@ -609,7 +615,6 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 	(*membership) = shared.CombineTables(*membership, readMessages(server, id))
 	self_mutex.Unlock()
 
-	// TODO
 	// look for longest block chain of neighbors, add/subtract any new/spent transactions
 	// loop through membership table
 	// if length of member's bc > ours, validate blockchain
@@ -621,7 +626,6 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 			self_mutex.Unlock()
 		}
 		// go through each member's list of UTX
-		//member_utx := set.From[*shared.Transaction](member.UTX)
 		for _, tx := range member.UTX {
 			if !tx_contains(self_node.UTX, tx) && !tx_contains(spent_tx, tx) {
 				self_mutex.Lock()
