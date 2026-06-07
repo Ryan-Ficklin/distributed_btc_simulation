@@ -99,21 +99,21 @@ func main() {
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
-		ID: id, 
-    PubKey: pubkey_bytes, 
-    Hbcounter: 0, 
-    Time: currTime, 
-    Alive: true, 
-    Blockchain: []shared.Block{}, 
-    UTX: []shared.Transaction{},
+		ID:         id,
+		PubKey:     pubkey_bytes,
+		Hbcounter:  0,
+		Time:       currTime,
+		Alive:      true,
+		Blockchain: []shared.Block{},
+		UTX:        []shared.Transaction{},
 	}
 	lastRecvHB = time.Now()
-  
-  // get our hard coded genesis block and add it to the start of our blockchain
+
+	// get our hard coded genesis block and add it to the start of our blockchain
 	genesis_block = make_genesis()
 	self_node.Blockchain = append(self_node.Blockchain, genesis_block)
-	
-  var self_node_response shared.Node // Allocate space for a response to overwrite this
+
+	var self_node_response shared.Node // Allocate space for a response to overwrite this
 
 	// Add node with input ID
 	if err := server.Call("Membership.Add", self_node, &self_node_response); err != nil {
@@ -160,11 +160,10 @@ func user(membership shared.Membership) {
 	case 0:
 		fmt.Print(choice)
 	case 1:
-    printBlockchain(self_node.Blockchain)
+		printBlockchain(self_node.Blockchain)
 	case 2:
 		fmt.Print(choice)
 	case 3:
-		//reader2 := bufio.NewReader(os.Stdin)
 		var id int
 		var amt int
 		fmt.Print("Who do you want to send money to?: ")
@@ -174,7 +173,7 @@ func user(membership shared.Membership) {
 		use_pk := lookup(id, membership)
 		create_TX(use_pk, amt)
 	case 4:
-		fmt.Print("blah")
+		mine()
 	}
 	go user(membership)
 }
@@ -413,10 +412,19 @@ func validate_blockchain(blockchain []shared.Block) bool {
 	return true
 }
 
-// mine valid block
-func mine() shared.Block {
+// mine valid block & add to blockchain
+func mine() {
 	// go through utx
-	utx_num := rand.Intn((len(self_node.UTX) - 1)) // from 0 to len-1
+	var utx_num int
+	if !(len(self_node.UTX) > 0) {
+		fmt.Println("No available transactions to mine.")
+		return
+	}
+	if len(self_node.UTX) == 1 {
+		utx_num = 0
+	} else {
+		utx_num = rand.Intn((len(self_node.UTX) - 1)) // from 0 to len-1
+	}
 	utx := self_node.UTX[utx_num]
 	// set prev to current last block in bc
 	prev := self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID
@@ -425,13 +433,17 @@ func mine() shared.Block {
 	// return
 	tx_encoding, _ := json.Marshal(utx)
 	tx_hash := sha256.Sum256(tx_encoding)
-	return shared.Block{
+	new_block := shared.Block{
 		Block_ID: tx_hash[:],
 		Nonce:    nonce,
 		POW:      hash,
 		Prev:     prev,
 		TX:       utx,
 	}
+
+	self_node.Blockchain = append(self_node.Blockchain, new_block)
+	spent_tx = append(spent_tx, utx)
+	self_node.UTX = append(self_node.UTX[:utx_num], self_node.UTX[utx_num+1:]...)
 }
 
 // given a transaction and a previous block ID, compute the proof of work
@@ -472,17 +484,17 @@ func make_genesis() shared.Block {
 
 	// sign this input
 	/*
-  in_encoding, _ := json.Marshal(input)
-	out_encoding, _ := json.Marshal(output)
-	encoding := append(in_encoding, out_encoding...)
-	hash := sha256.Sum256(encoding)
-	sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
-  */
+		  in_encoding, _ := json.Marshal(input)
+			out_encoding, _ := json.Marshal(output)
+			encoding := append(in_encoding, out_encoding...)
+			hash := sha256.Sum256(encoding)
+			sig, _ := ecdsa.SignASN1(nil, &private_key, hash[:])
+	*/
 
-  // hardcode signature from client1's private key 
-  sig, _ := hex.DecodeString("30450220661a6b739f063f76b61860757ec03f37901576c367b53d6c07e9dfaede71f812022100e37c59a65c016259664f148095a55762aadbf31042cff8f0f9ea14ffe111779f") 
-	
-  tx := shared.Transaction{Signature: sig, Input: input, Output: output}
+	// hardcode signature from client1's private key
+	sig, _ := hex.DecodeString("30450220661a6b739f063f76b61860757ec03f37901576c367b53d6c07e9dfaede71f812022100e37c59a65c016259664f148095a55762aadbf31042cff8f0f9ea14ffe111779f")
+
+	tx := shared.Transaction{Signature: sig, Input: input, Output: output}
 
 	tx_encoding, _ := json.Marshal(tx)
 	tx_hash := sha256.Sum256(tx_encoding)
@@ -716,23 +728,23 @@ func printMembership(m shared.Membership) {
 }
 
 func printBlockchain(bc []shared.Block) {
-  for id, b := range bc {
-    fmt.Println(id)
-    printBlock(b)
-  }
+	for id, b := range bc {
+		fmt.Println(id)
+		printBlock(b)
+	}
 }
 
 func printBlock(b shared.Block) {
-  fmt.Printf("id: %x\nnonce: %x\npow: %x\nprev_id: %x\n",
-    b.Block_ID, b.Nonce, b.POW, b.Prev)
-  printTx(b.TX)
+	fmt.Printf("id: %x\nnonce: %x\npow: %x\nprev_id: %x\n",
+		b.Block_ID, b.Nonce, b.POW, b.Prev)
+	printTx(b.TX)
 }
 
 func printTx(tx shared.Transaction) {
-  fmt.Printf("signature: %x\ninput:\n{\n\tblock_id: %x\n\tout_id: %x\n}\noutput(s):\n{", 
-    tx.Signature, tx.Input.Block_ID, tx.Input.N)
-  for i, o := range tx.Output {
-    fmt.Printf("\n\t%d: {\n\tvalue: %d\n\tpub_key: %x\n\t}", i, o.Value, o.PubKey)
-  }
-  fmt.Printf("\n}\n")
+	fmt.Printf("signature: %x\ninput:\n{\n\tblock_id: %x\n\tout_id: %x\n}\noutput(s):\n{",
+		tx.Signature, tx.Input.Block_ID, tx.Input.N)
+	for i, o := range tx.Output {
+		fmt.Printf("\n\t%d: {\n\tvalue: %d\n\tpub_key: %x\n\t}", i, o.Value, o.PubKey)
+	}
+	fmt.Printf("\n}\n")
 }
