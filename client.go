@@ -68,7 +68,10 @@ func main() {
 	}
 
 	// read key from keys.txt
-	fi, _ := os.Open("./keys.txt")
+	fi, err := os.Open("./keys.txt")
+  if err != nil {
+    panic("could not open file")
+  }
 
 	// this is obviously super unsafe but makes the simulation easier
 	scanner := bufio.NewScanner(fi)
@@ -76,20 +79,19 @@ func main() {
 	var private_key_txt string
 	for scanner.Scan() {
 		// this line is my private key
-		if i == self_node.ID {
+		if i == id {
 			private_key_txt = scanner.Text()
 		}
 		i++
 	}
-	fmt.Println(private_key_txt)
-	decoded_pk, _ := hex.DecodeString(private_key_txt[:len(private_key_txt)])
+	
+  // close keys.txt
+	fi.Close()
+	
+  decoded_pk, _ := hex.DecodeString(private_key_txt[:len(private_key_txt)])
 	private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), decoded_pk)
-	//private_key, err := ecdsa.GenerateKey(elliptic.P256(), nil)
 	pubkey := private_key.Public()
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
-
-	// close keys.txt
-	fi.Close()
 
 	// proper error handling
 	currTime := calcTime()
