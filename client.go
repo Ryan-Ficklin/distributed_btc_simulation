@@ -376,9 +376,9 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 func validate_blockchain(blockchain []shared.Block) bool {
 	var local_spent []shared.Transaction
 	// check if blockchain[0] is our genesis
-  if !compare_block(genesis_block, blockchain[0]) {
-    return false
-  }
+	if !compare_block(genesis_block, blockchain[0]) {
+		return false
+	}
 
 	for i := 1; i < len(blockchain); i++ {
 		prev := blockchain[i-1]
@@ -485,13 +485,14 @@ func make_genesis() shared.Block {
 
 // compare if two blocks are the same
 func compare_block(block1 shared.Block, block2 shared.Block) bool {
-  same := true
+	same := true
 
-  same := same && bytes.Equal(block1.Block_ID, block2.Block_ID)
-  same := same && bytes.Equal(block1.Nonce, block2.Nonce)
-  same := same && bytes.Equal(block1.POW, block2.POW)
-  same := same && bytes.Equal(block1.Prev, block2.Prev)
-  same := same && compare_tx(block1.TX, block2.TX)
+	same = same && bytes.Equal(block1.Block_ID, block2.Block_ID)
+	same = same && bytes.Equal(block1.Nonce, block2.Nonce)
+	same = same && bytes.Equal(block1.POW, block2.POW)
+	same = same && bytes.Equal(block1.Prev, block2.Prev)
+	same = same && compare_tx(block1.TX, block2.TX)
+	return same
 }
 
 // helper for continuously printing status
@@ -537,34 +538,34 @@ func check_difficulty(pow []byte, leading uint) bool {
 // check if lst of transactions has a provided transaction
 func tx_contains(lst []shared.Transaction, item shared.Transaction) bool {
 	for _, tx := range lst {
-    if compare_tx(item, tx) {
-      return true
-    }
+		if compare_tx(item, tx) {
+			return true
+		}
 	}
 	return false
 }
 
-// given two transactions compare if they are the same 
+// given two transactions compare if they are the same
 func compare_tx(tx1 shared.Transaction, tx2 shared.Transaction) bool {
-  // signature the same
-  sig_same := bytes.Equal(tx1.Signature, tx2.Signature)
-  // input the same
-  input_same := bytes.Equal(tx1.Input.Block_ID, tx2.Input.Block_ID) &&
-    tx1.Input.N == tx2.Input.N
+	// signature the same
+	sig_same := bytes.Equal(tx1.Signature, tx2.Signature)
+	// input the same
+	input_same := bytes.Equal(tx1.Input.Block_ID, tx2.Input.Block_ID) &&
+		tx1.Input.N == tx2.Input.N
 
-  // output the same
-  output_same := true
-  if len(tx1.Output) == len(tx2.Output) {
-    // check if each output is equal
-    for i, o := range tx1.Output {
-      output_same = output_same && o.Value == tx2.Output[i].Value &&
-        bytes.Equal(o.PubKey, tx2.Output[i].PubKey)
-    }
-  } else {
-    output_same = false
-  }
+	// output the same
+	output_same := true
+	if len(tx1.Output) == len(tx2.Output) {
+		// check if each output is equal
+		for i, o := range tx1.Output {
+			output_same = output_same && o.Value == tx2.Output[i].Value &&
+				bytes.Equal(o.PubKey, tx2.Output[i].PubKey)
+		}
+	} else {
+		output_same = false
+	}
 
-  return output_same && input_same && sig_same
+	return output_same && input_same && sig_same
 }
 
 // ~~~~~~~~ GOSSIP HB PROTOCOL ~~~~~~~~~~~~
