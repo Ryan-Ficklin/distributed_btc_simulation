@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 
+	//"io"
 	"math/rand"
 	"net/rpc"
 	"os"
-  "io"
 	"strconv"
 
 	"github.com/Ryan-Ficklin/distributed_btc_simulation/shared"
@@ -18,6 +19,7 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"sync"
 	"time"
@@ -64,34 +66,36 @@ func main() {
 	if err != nil {
 		fmt.Println("Found Error", err)
 	}
-  
-  // read key from keys.txt
-  fi, _ := os.Open("./keys.txt")
-  
-  // this is obviously super unsafe but makes the simulation easier 
-  scanner := bufio.NewScanner(fi)
-  i := 1
-  for scanner.Scan() {
-    // this line is my private key
-    if i == self_node.ID {
-      private_key_txt := scanner.Text()
-    }
-    i++
-  }
 
-  private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), private_key_txt)
+	// read key from keys.txt
+	fi, _ := os.Open("./keys.txt")
+
+	// this is obviously super unsafe but makes the simulation easier
+	scanner := bufio.NewScanner(fi)
+	i := 1
+	var private_key_txt string
+	for scanner.Scan() {
+		// this line is my private key
+		if i == self_node.ID {
+			private_key_txt = scanner.Text()
+		}
+		i++
+	}
+	fmt.Println(private_key_txt)
+	decoded_pk, _ := hex.DecodeString(private_key_txt[:len(private_key_txt)])
+	private_key, _ := ecdsa.ParseRawPrivateKey(elliptic.P256(), decoded_pk)
 	//private_key, err := ecdsa.GenerateKey(elliptic.P256(), nil)
 	pubkey := private_key.Public()
 	pubkey_bytes, _ := x509.MarshalPKIXPublicKey(pubkey)
-  
-  // close keys.txt 
-  fi.Close()
-  
-  // proper error handling
+
+	// close keys.txt
+	fi.Close()
+
+	// proper error handling
 	currTime := calcTime()
 	// Construct self
 	self_node = shared.Node{
-		ID: id, PubKey: pk_bytes, Hbcounter: 0, Time: currTime, Alive: true,
+		ID: id, PubKey: pubkey_bytes, Hbcounter: 0, Time: currTime, Alive: true,
 	}
 	lastRecvHB = time.Now()
 
