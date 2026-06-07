@@ -35,7 +35,7 @@ const (
 	ELECTION_MAX = 3000
 	ELECTION_MIN = 1500
 	LEADER_HB    = 500 // intervals for leader HB
-	DIFFICULTY   = 25
+	DIFFICULTY   = 23
 )
 
 var (
@@ -111,7 +111,9 @@ func main() {
 
 	// get our hard coded genesis block and add it to the start of our blockchain
 	genesis_block = make_genesis()
+	self_mutex.Lock()
 	self_node.Blockchain = append(self_node.Blockchain, genesis_block)
+	self_mutex.Unlock()
 
 	var self_node_response shared.Node // Allocate space for a response to overwrite this
 
@@ -147,35 +149,38 @@ func main() {
 func user(membership shared.Membership) {
 	// genesis := make_genesis()
 	// fmt.Printf("nonce: %x\npow: %x\n", genesis.Nonce, genesis.POW)
-	// reader := bufio.NewReader(os.Stdin)
-	fmt.Print("\t0: Print keys\n",
-		"\t1: Print blockchain\n",
-		"\t2: Print UTX pool\n",
-		"\t3: Create UTX\n",
-		"\t4: Mine a block\n\n",
-		"Enter your choice -> ")
-	var choice int
-	fmt.Scanln(&choice)
-	switch choice {
-	case 0:
-		fmt.Print(choice)
-	case 1:
-		printBlockchain(self_node.Blockchain)
-	case 2:
-		fmt.Print(choice)
-	case 3:
-		var id int
-		var amt int
-		fmt.Print("Who do you want to send money to?: ")
-		fmt.Scanln(&id)
-		fmt.Print("How much money?: ")
-		fmt.Scanln(&amt)
-		use_pk := lookup(id, membership)
-		create_TX(use_pk, amt)
-	case 4:
-		mine()
+	for {
+		fmt.Print("\t1: Print blockchain\n",
+			"\t2: Print UTX pool\n",
+			"\t3: Create UTX\n",
+			"\t4: Mine a block\n\n",
+			"Enter your choice -> ")
+		var choice int
+		fmt.Scanln(&choice)
+		switch choice {
+		case 1:
+			printBlockchain(self_node.Blockchain)
+		case 2:
+			printUTXPool(self_node.UTX)
+		case 3:
+			var id int
+			var amt int
+			fmt.Print("Who do you want to send money to?: ")
+			fmt.Scanln(&id)
+			fmt.Print("How much money?: ")
+			fmt.Scanln(&amt)
+			use_pk := lookup(id, membership)
+			create_TX(use_pk, amt)
+		case 4:
+			fmt.Println("Mining...")
+			mine()
+		default:
+			fmt.Println("Not a valid input.")
+		}
+		if !self_node.Alive {
+			break
+		}
 	}
-	go user(membership)
 }
 
 // given a recipient public key and value
@@ -183,6 +188,7 @@ func user(membership shared.Membership) {
 // create new TX struct giving value to recipient and sign it with my PK
 // add to my list of utx
 func create_TX(recipient []byte, value int) {
+	fmt.Println("recipient pk:", recipient)
 	// find coins from which to give
 	println("creating transaction...")
 	block_id, out_idx := collect_coins(value)
@@ -248,7 +254,7 @@ func collect_coins(value int) ([]byte, int) {
 				for j := index + 1; j < len(self_node.Blockchain); j++ {
 					// this out index of this blockchain is stale
 					if self_node.Blockchain[j].TX.Input.N == out_n &&
-						bytes.Equal(block_id, self_node.Blockchain[j].Block_ID) {
+						bytes.Equal(block_id, self_node.Blockchain[j].TX.Input.Block_ID) {
 						// reset values -- not valid bc stale
 						block_id = nil
 						out_n = -1
@@ -291,19 +297,27 @@ func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 		}
 		total += out.Value
 	}
+	// check double spend
+
 	// coinbase special case
+	outputs := tx.Output
 	if coinbase {
+		outputs = outputs[:len(outputs)-1]
 		if tx.Output[len(tx.Output)-1].Value != 50 {
 			fmt.Println("Invalid coinbase")
 			return false
 		}
 		total -= 50
+
 	}
-	// check double spend
 	block_found := false
 	for _, block := range self_node.Blockchain {
+		if compare_tx(block.TX, tx) {
+			continue
+		}
+
 		if block.TX.Input.N == tx.Input.N &&
-			bytes.Equal(tx.Input.Block_ID, block.Block_ID) {
+			bytes.Equal(tx.Input.Block_ID, block.TX.Input.Block_ID) {
 			fmt.Println("Double spend")
 			return false
 		}
@@ -326,8 +340,9 @@ func validate_transaction(tx shared.Transaction, coinbase bool) bool {
 				fmt.Println("Incorrect type of key")
 				return false
 			}
-			in_encoding, _ := json.Marshal(block.TX.Input)
-			out_encoding, _ := json.Marshal(block.TX.Output)
+
+			in_encoding, _ := json.Marshal(tx.Input)
+			out_encoding, _ := json.Marshal(outputs)
 			encoding := append(in_encoding, out_encoding...)
 			hash := sha256.Sum256(encoding)
 			if !ecdsa.VerifyASN1(pk, hash[:], tx.Signature) {
@@ -359,16 +374,19 @@ func validate_block(block shared.Block, prev shared.Block, difficulty uint) bool
 
 	// check that the pow passes the difficulty
 	if !check_difficulty(hash[:], difficulty) {
+		fmt.Println("difficulty is invalid")
 		return false
 	}
 
 	// does the pow actually produce the correct hash of the fields?
 	if !bytes.Equal(hash[:], block.POW) {
+		fmt.Println("hash is invalid")
 		return false
 	}
 
 	// does previous point to the previous block's ID?
 	if !bytes.Equal(block.Prev, prev.Block_ID) {
+		fmt.Println("previous is invalid")
 		return false
 	}
 
@@ -402,13 +420,15 @@ func validate_blockchain(blockchain []shared.Block) bool {
 	for i := 1; i < len(blockchain); i++ {
 		prev := blockchain[i-1]
 		if !validate_block(blockchain[i], prev, DIFFICULTY) {
+			//fmt.Println("difficulty is invalid")
 			return false
 		}
 		local_spent = append(local_spent, blockchain[i].TX)
 	}
-	self_mutex.Lock()
+	// self_mutex.Lock()
 	spent_tx = local_spent
-	self_mutex.Unlock()
+	// self_mutex.Unlock()
+	fmt.Println("Valid blockchain")
 	return true
 }
 
@@ -426,6 +446,12 @@ func mine() {
 		utx_num = rand.Intn((len(self_node.UTX) - 1)) // from 0 to len-1
 	}
 	utx := self_node.UTX[utx_num]
+	// make coinbase transaction
+	new_txout := shared.TX_Output{
+		Value:  50,
+		PubKey: self_node.PubKey,
+	}
+	utx.Output = append(utx.Output, new_txout)
 	// set prev to current last block in bc
 	prev := self_node.Blockchain[len(self_node.Blockchain)-1].Block_ID
 	// compute
@@ -441,9 +467,11 @@ func mine() {
 		TX:       utx,
 	}
 
+	self_mutex.Lock()
 	self_node.Blockchain = append(self_node.Blockchain, new_block)
 	spent_tx = append(spent_tx, utx)
-	self_node.UTX = append(self_node.UTX[:utx_num], self_node.UTX[utx_num+1:]...)
+	self_node.UTX = append(self_node.UTX[:utx_num], self_node.UTX[utx_num+1:]...) // removing
+	self_mutex.Unlock()
 }
 
 // given a transaction and a previous block ID, compute the proof of work
@@ -475,11 +503,12 @@ func compute_pow(tx shared.Transaction, prev_id []byte, difficulty uint) ([]byte
 
 // this derives the hard-coded genesis block and was previously used to compute the POW
 func make_genesis() shared.Block {
+	node1_pk, _ := hex.DecodeString("3059301306072a8648ce3d020106082a8648ce3d03010703420004d08ec1d08b33f834fd74d7b21e8ef5de3c962ec2a469f3ee159ee1eff65d76b7117cc1f91b81dd8d822713f0276ffe4727e7e6ca6a2aae9657dd9570de13a73e")
 	input := shared.TX_Input{Block_ID: []byte("0000000000000000000000000000000000000000000000000000000000000000"), N: 0}
 	output := []shared.TX_Output{
 		shared.TX_Output{
 			Value:  50,
-			PubKey: self_node.PubKey,
+			PubKey: node1_pk,
 		}}
 
 	// sign this input
@@ -496,7 +525,7 @@ func make_genesis() shared.Block {
 
 	tx := shared.Transaction{Signature: sig, Input: input, Output: output}
 
-	tx_encoding, _ := json.Marshal(tx)
+	tx_encoding, _ := hex.DecodeString("2860d71d1565b2a35ba60ed451dbab463105d2b24b19f9c5843a82c38b7ac25b")
 	tx_hash := sha256.Sum256(tx_encoding)
 
 	//pow, nonce := compute_pow(tx, tx_hash[:], DIFFICULTY)
@@ -676,32 +705,45 @@ func shareMembershipTables(server *rpc.Client, neighbors [3]int, membership **sh
 	(*membership) = shared.CombineTables(*membership, readMessages(server, id))
 	self_mutex.Unlock()
 
+	// schedule the next gossip
+	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
+
 	// look for longest block chain of neighbors, add/subtract any new/spent transactions
 	// loop through membership table
 	// if length of member's bc > ours, validate blockchain
 	// transaction adding + removing
+	self_mutex.Lock()
 	for _, member := range (**membership).Members {
-		if len(member.Blockchain) > len(self_node.Blockchain) && validate_blockchain(member.Blockchain) {
-			self_mutex.Lock()
-			self_node.Blockchain = member.Blockchain
-			self_mutex.Unlock()
+		if len(member.Blockchain) > len(self_node.Blockchain) {
+			valid := validate_blockchain(member.Blockchain)
+			//self_mutex.Lock()
+			if valid {
+				fmt.Println("Blockchain is valid!")
+				self_node.Blockchain = member.Blockchain
+			}
+
+			//self_mutex.Unlock()
 		}
 		// go through each member's list of UTX
 		for _, tx := range member.UTX {
+
 			if !tx_contains(self_node.UTX, tx) && !tx_contains(spent_tx, tx) {
-				self_mutex.Lock()
+				//self_mutex.Lock()
 				self_node.UTX = append(self_node.UTX, tx)
-				self_mutex.Unlock()
+				//self_mutex.Unlock()
 			}
 		}
 	}
-
-	// schedule the next gossip
-	time.AfterFunc(time.Millisecond*Y_TIME, func() { shareMembershipTables(server, neighbors, membership, id) })
+	self_mutex.Unlock()
 }
 
 func lookup(key int, membership shared.Membership) []byte {
-	return membership.Members[key].PubKey
+	for _, member := range membership.Members {
+		if member.ID == key {
+			return member.PubKey
+		}
+	}
+	return nil
 }
 
 // only for killing nodes at random
@@ -731,6 +773,15 @@ func printBlockchain(bc []shared.Block) {
 	for id, b := range bc {
 		fmt.Println(id)
 		printBlock(b)
+	}
+}
+
+func printUTXPool(utx []shared.Transaction) {
+	if len(utx) == 0 {
+		fmt.Println("UTX pool is empty!")
+	}
+	for _, tx := range utx {
+		printTx(tx)
 	}
 }
 
